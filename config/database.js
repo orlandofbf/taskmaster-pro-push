@@ -1,54 +1,38 @@
-const sqlite3 = require('sqlite3').verbose();
-const path = require('path');
+const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
 
-// Caminho do banco de dados
-const dbPath = path.join(__dirname, '..', 'database.sqlite');
-
-// Criar conexão com SQLite
-const db = new sqlite3.Database(dbPath, (err) => {
-    if (err) {
-        console.error('❌ Erro ao conectar SQLite:', err.message);
-    } else {
-        console.log('✅ Conectado ao banco SQLite');
-    }
+// Configuração do PostgreSQL
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 });
 
-// Função para executar queries
-function query(sql, params = []) {
-    return new Promise((resolve, reject) => {
-        if (sql.trim().toUpperCase().startsWith('SELECT') || sql.trim().toUpperCase().startsWith('PRAGMA')) {
-            db.all(sql, params, (err, rows) => {
-                if (err) {
-                    reject(err);
-                } else {
-                    resolve({ rows });
-                }
-            });
+// Função para executar queries (similar ao SQLite)
+async function query(sql, params = []) {
+    try {
+        const result = await pool.query(sql, params);
+        if (sql.trim().toUpperCase().startsWith('SELECT')) {
+            return { rows: result.rows };
         } else {
-            db.run(sql, params, function(err) {
-                if (err) {
-                    reject(err);
-                } else {
-                    resolve({ 
-                        rows: [{ id: this.lastID }],
-                        rowsAffected: this.changes,
-                        lastID: this.lastID
-                    });
-                }
-            });
+            return { 
+                rows: result.rows,
+                rowsAffected: result.rowCount,
+                lastID: result.rows[0]?.id || null
+            };
         }
-    });
+    } catch (error) {
+        throw error;
+    }
 }
 
 // Função para testar conexão
 async function testConnection() {
     try {
-        await query("SELECT 1 as test");
-        console.log('✅ Conexão com SQLite OK');
+        await pool.query("SELECT 1 as test");
+        console.log('✅ Conexão com PostgreSQL OK');
         return true;
     } catch (error) {
-        console.error('❌ Erro na conexão SQLite:', error.message);
+        console.error('❌ Erro na conexão PostgreSQL:', error.message);
         return false;
     }
 }
@@ -56,104 +40,93 @@ async function testConnection() {
 // Inicializar tabelas
 async function initializeDatabase() {
     try {
-        // Verificar se coluna password existe na tabela users
-        const tableInfo = await query("PRAGMA table_info(users)");
-        const hasPasswordColumn = tableInfo.rows.some(row => row.name === 'password');
-        
-        if (!hasPasswordColumn) {
-            console.log('🔧 Adicionando coluna password à tabela users...');
-            await query("ALTER TABLE users ADD COLUMN password TEXT");
-            console.log('✅ Coluna password adicionada');
-            
-            // Atualizar usuário padrão com senha
-            const defaultPassword = await bcrypt.hash('admin123', 12);
-            await query("UPDATE users SET password = ? WHERE email = 'admin@taskmaster.com'", [defaultPassword]);
-            console.log('✅ Senha padrão definida para admin@taskmaster.com');
-            console.log('🔐 Login: admin@taskmaster.com / admin123');
-        }
+        console.log('🔧 Inicializando banco PostgreSQL...');
 
-        // Criar tabela users (se não existir) - AGORA COM PASSWORD
-        await query(`
+        // Criar extensão para UUID apenas se necessário
+        await pool.query(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"`);
+
+        // Criar tabela users
+        await pool.query(`
             CREATE TABLE IF NOT EXISTS users (
-                id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+                id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::text,
                 name TEXT NOT NULL,
                 email TEXT UNIQUE NOT NULL,
                 password TEXT NOT NULL,
                 is_active BOOLEAN DEFAULT true,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         `);
 
         // Criar tabela tasks
-        await query(`
+        await pool.query(`
             CREATE TABLE IF NOT EXISTS tasks (
-                id TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
+                id TEXT PRIMARY KEY DEFAULT uuid_generate_v4()::text,
                 title TEXT NOT NULL,
                 description TEXT,
                 status TEXT DEFAULT 'pendente' CHECK (status IN ('pendente', 'em_progresso', 'concluida')),
                 priority TEXT DEFAULT 'media' CHECK (priority IN ('baixa', 'media', 'alta', 'urgente')),
-                due_date DATETIME,
+                due_date TIMESTAMP,
                 user_id TEXT NOT NULL,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users (id)
             )
         `);
 
-        // Inserir usuário padrão se não existir
-        const existingUsers = await query("SELECT COUNT(*) as count FROM users");
-        if (existingUsers.rows[0].count === 0) {
+        // Verificar se usuário padrão existe
+        const existingUsers = await pool.query("SELECT COUNT(*) as count FROM users");
+        if (existingUsers.rows[0].count == 0) {
             const defaultPassword = await bcrypt.hash('admin123', 12);
-            await query(`
+            // Inserir usuário padrão
+            await pool.query(`
                 INSERT INTO users (id, name, email, password, is_active)
-                VALUES ('149aaad6-8b7e-493b-8a43-93a06ad5836a', 'Usuário Padrão', 'admin@taskmaster.com', ?, true)
+                VALUES ('personal-user-2025', 'Meu TaskMaster', 'meu@taskmaster.com', $1, true)
             `, [defaultPassword]);
 
-            // Inserir algumas tarefas de exemplo
+            // Inserir tarefas de exemplo
             const sampleTasks = [
                 {
-                    title: 'Configurar ambiente de desenvolvimento',
-                    description: 'Instalar Node.js, VS Code e dependências do projeto',
+                    title: '🎯 Bem-vindo ao TaskMaster Pro!',
+                    description: 'Esta é sua primeira tarefa. Explore as funcionalidades!',
                     priority: 'alta',
-                    status: 'concluida'
+                    status: 'pendente'
                 },
                 {
-                    title: 'Criar sistema de autenticação',
-                    description: 'Implementar login e cadastro de usuários',
-                    priority: 'urgente',
-                    status: 'em_progresso'
-                },
-                {
-                    title: 'Implementar notificações push',
-                    description: 'Adicionar sistema de notificações em tempo real',
+                    title: '✅ Configurar perfil pessoal',
+                    description: 'Personalize suas informações e preferências',
                     priority: 'media',
                     status: 'pendente'
                 },
                 {
-                    title: 'Fazer deploy da aplicação',
-                    description: 'Configurar Railway e colocar aplicação online',
+                    title: '🚀 Testar persistência de dados',
+                    description: 'Criar, editar e excluir tarefas para testar o sistema',
                     priority: 'alta',
                     status: 'em_progresso'
                 }
             ];
 
             for (const task of sampleTasks) {
-                await query(`
+                await pool.query(`
                     INSERT INTO tasks (title, description, priority, status, user_id)
-                    VALUES (?, ?, ?, ?, '149aaad6-8b7e-493b-8a43-93a06ad5836a')
+                    VALUES ($1, $2, $3, $4, 'personal-user-2025')
                 `, [task.title, task.description, task.priority, task.status]);
             }
 
             console.log('✅ Dados iniciais inseridos');
+            console.log('🔐 Login: meu@taskmaster.com / admin123');
         }
 
-        console.log('✅ Banco de dados inicializado');
+        console.log('✅ Banco PostgreSQL inicializado');
+        console.log('👤 Modo Pessoal ativo');
+        
     } catch (error) {
         console.error('❌ Erro ao inicializar banco:', error.message);
+        throw error;
     }
 }
 
 module.exports = {
+    pool,
     query,
     testConnection,
     initializeDatabase

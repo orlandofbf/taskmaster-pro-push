@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TaskMaster Pro - Teste de API</title>
+    <style>
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1000px; 
+            margin: 0 auto; 
+            padding: 20px;
+            background: #f8f9fa;
+        }
+        .header {
+            text-align: center;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+        }
+        .test-section { 
+            background: white;
+            padding: 25px;
+            margin: 20px 0;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .test-section h2 {
+            color: #333;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+        .credentials {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            border-left: 4px solid #2196f3;
+        }
+        .credentials strong {
+            color: #1976d2;
+        }
+        button { 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            margin: 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: transform 0.2s;
+        }
+        button:hover { 
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        .result { 
+            background: #f8f9fa;
+            padding: 15px;
+            margin: 15px 0;
+            border-left: 4px solid #667eea;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            white-space: pre-wrap;
+        }
+        .error { border-left-color: #dc3545; background: #fff5f5; }
+        .success { border-left-color: #28a745; background: #f0fff4; }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-left: 10px;
+        }
+        .status-200 { background: #d4edda; color: #155724; }
+        .status-201 { background: #d4edda; color: #155724; }
+        .status-400 { background: #f8d7da; color: #721c24; }
+        .status-401 { background: #f8d7da; color: #721c24; }
+        .status-500 { background: #f5c6cb; color: #721c24; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🚀 TaskMaster Pro</h1>
+        <p>Teste Completo de APIs - Versão 2.0.0</p>
+    </div>
+    
+    <div class="test-section">
+        <h2>📝 Teste de Registro de Usuário</h2>
+        <p>Registra um novo usuário no sistema com email único</p>
+        <button onclick="testRegister()">🔐 Registrar Usuário</button>
+        <div id="register-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>🔐 Teste de Login</h2>
+        <p>Faz login com credenciais de teste</p>
+        <div class="credentials">
+            <strong>📋 Credenciais Disponíveis:</strong><br>
+            • <strong>Admin:</strong> admin@taskmaster.com / admin123<br>
+            • <strong>Teste:</strong> Qualquer usuário registrado / 123456
+        </div>
+        <button onclick="testLogin()">🚪 Login Admin</button>
+        <button onclick="testLoginUser()">🚪 Login Usuário Teste</button>
+        <div id="login-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>📋 Teste de Tarefas</h2>
+        <p>Lista todas as tarefas disponíveis no sistema</p>
+        <button onclick="testTasks()">📝 Listar Tarefas</button>
+        <button onclick="testCreateTask()">➕ Criar Tarefa</button>
+        <div id="tasks-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>👥 Teste de Usuários</h2>
+        <p>Lista todos os usuários cadastrados no sistema</p>
+        <button onclick="testUsers()">👥 Listar Usuários</button>
+        <div id="users-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>⚙️ Teste de Sistema</h2>
+        <p>Verifica status e saúde do sistema</p>
+        <button onclick="testStatus()">📊 Status do Sistema</button>
+        <button onclick="testAuth()">🔍 Verificar Token</button>
+        <div id="system-result"></div>
+    </div>
+
+    <script>
+        let authToken = localStorage.getItem('token');
+        let lastRegisteredEmail = localStorage.getItem('lastRegisteredEmail');
+
+        function showResult(elementId, status, data, isError = false) {
+            const element = document.getElementById(elementId);
+            const statusClass = status >= 200 && status < 300 ? 'success' : 'error';
+            const statusBadge = `<span class="status-badge status-${status}">Status: ${status}</span>`;
+            
+            element.innerHTML = `
+                <div class="result ${statusClass}">
+                    <strong>Resposta:</strong> ${statusBadge}<br>
+                    <strong>Dados:</strong><br>${JSON.stringify(data, null, 2)}
+                </div>`;
+        }
+
+        async function testRegister() {
+            try {
+                const email = `teste${Date.now()}@taskmaster.com`;
+                const response = await fetch('/api/auth/register', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: 'Usuário Teste',
+                        email: email,
+                        password: '123456'
+                    })
+                });
+                
+                const data = await response.json();
+                showResult('register-result', response.status, data);
+                
+                if (data.token) {
+                    authToken = data.token;
+                    localStorage.setItem('token', data.token);
+                    localStorage.setItem('lastRegisteredEmail', email);
+                    lastRegisteredEmail = email;
+                }
+            } catch (error) {
+                showResult('register-result', 500, { error: error.message }, true);
+            }
+        }
+
+        async function testLogin() {
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: 'admin@taskmaster.com',
+                        password: 'admin123'
+                    })
+                });
+                
+                const data = await response.json();
+                showResult('login-result', response.status, data);
+                
+                if (data.token) {
+                    authToken = data.token;
+                    localStorage.setItem('token', data.token);
+                }
+            } catch (error) {
+                showResult('login-result', 500, { error: error.message }, true);
+            }
+        }
+
+        async function testLoginUser() {
+            try {
+                if (!lastRegisteredEmail) {
+                    showResult('login-result', 400, { 
+                        error: 'Nenhum usuário registrado encontrado. Registre um usuário primeiro.' 
+                    }, true);
+                    return;
+                }
+
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: lastRegisteredEmail,
+                        password: '123456'
+                    })
+                });
+                
+                const data = await response.json();
+                showResult('login-result', response.status, data);
+                
+                if (data.token) {
+                    authToken = data.token;
+                    localStorage.setItem('token', data.token);
+                }
+            } catch (error) {
+                showResult('login-result', 500, { error: error.message }, true);
+            }
+        }
+
+        async function testTasks() {
+            try {
+                const headers = { 'Content-Type': 'application/json' };
+                if (authToken) {
+                    headers['Authorization'] = `Bearer ${authToken}`;
+                }
+
+                const response = await fetch('/api/tasks', { headers });
+                const data = await response.json();
+                showResult('tasks-result', response.status, data);
+            } catch (error) {
+                showResult('tasks-result', 500, { error: error.message }, true);
+            }
+        }
+
+        async function testCreateTask() {
+            try {
+                const headers = { 'Content-Type': 'application/json' };
+                if (authToken) {
+                    headers['Authorization'] = `Bearer ${authToken}`;
+                }
+
+                const response = await fetch('/api/tasks', {
+                    method: 'POST',
+                    headers,
+                    body: JSON.stringify({
+                        title: `Tarefa de Teste ${new Date().toLocaleString('pt-BR')}`,
+                        description: 'Tarefa criada automaticamente pelo sistema de testes',
+                        priority: 'media',
+                        status: 'pendente'
+                    })
+                });
+                
+                const data = await response.json();
+                showResult('tasks-result', response.status, data);
+            } catch (error) {
+                showResult('tasks-result', 500, { error: error.message }, true);
+            }
+        }
+
+        async function testUsers() {
+            try {
+                const response = await fetch('/api/users');
+                const data = await response.json();
+                showResult('users-result', response.status, data);
+            } catch (error) {
+                showResult('users-result', 500, { error: error.message }, true);
+            }
+        }
+
+        async function testStatus() {
+            try {
+                const response = await fetch('/api/status');
+                const data = await response.json();
+                showResult('system-result', response.status, data);
+            } catch (error) {
+                showResult('system-result', 500, { error: error.message }, true);
+            }
+        }
+
+        async function testAuth() {
+            try {
+                if (!authToken) {
+                    showResult('system-result', 401, { 
+                        error: 'Nenhum token disponível. Faça login primeiro.' 
+                    }, true);
+                    return;
+                }
+
+                const response = await fetch('/api/auth/verify', {
+                    headers: { 'Authorization': `Bearer ${authToken}` }
+                });
+                
+                const data = await response.json();
+                showResult('system-result', response.status, data);
+            } catch (error) {
+                showResult('system-result', 500, { error: error.message }, true);
+            }
+        }
+
+        // Auto-carregar status do sistema ao carregar a página
+        window.onload = function() {
+            testStatus();
+            // Recuperar último email registrado
+            lastRegisteredEmail = localStorage.getItem('lastRegisteredEmail');
+        };
+    </script>
+</body>
+</html>

@@ -347,3 +347,6 @@ app.listen(PORT, '0.0.0.0', async () => {
         console.log('⚠️  Aplicação iniciada, mas sem conexão com banco');
     }
 });
+ 
+ / /   R e d e p l o y :   2 0 2 5 - 0 6 - 1 7   0 7 : 1 1 : 2 7  
+ 

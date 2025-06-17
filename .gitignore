@@ -67,7 +67,7 @@ dist
 
 # Gatsby files
 .cache/
-public
+# public (comentado - precisamos da pasta public para o TaskMaster)
 
 # Storybook build outputs
 .out

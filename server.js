@@ -30,12 +30,12 @@ app.use('/api/auth', require('./routes/auth'));
 // Rota de teste do banco
 app.get('/api/test-db', async (req, res) => {
     try {
-        const result = await query('SELECT datetime("now") as current_time, sqlite_version() as db_version');
+        const result = await query('SELECT NOW() as current_time, version() as db_version');
         res.json({
             success: true,
             message: 'Conexão com banco funcionando!',
             timestamp: result.rows[0].current_time,
-            database: `SQLite v${result.rows[0].db_version}`
+            database: result.rows[0].db_version
         });
     } catch (error) {
         res.status(500).json({
@@ -94,7 +94,7 @@ app.get('/api/tasks/:id', async (req, res) => {
                 u.name as user_name 
             FROM tasks t 
             JOIN users u ON t.user_id = u.id 
-            WHERE t.id = ?
+            WHERE t.id = $1
         `, [id]);
         
         if (result.rows.length === 0) {
@@ -123,11 +123,12 @@ app.post('/api/tasks', async (req, res) => {
         const { title, description, priority, due_date, user_id } = req.body;
         
         // Se não tiver user_id, usar o usuário padrão
-        const defaultUserId = user_id || '550e8400-e29b-41d4-a716-446655440000';
+        const defaultUserId = user_id || 'personal-user-2025';
         
         const result = await query(`
             INSERT INTO tasks (title, description, priority, due_date, user_id, status)
-            VALUES (?, ?, ?, ?, ?, 'pendente')
+            VALUES ($1, $2, $3, $4, $5, 'pendente')
+            RETURNING id
         `, [title, description, priority, due_date, defaultUserId]);
         
         // Buscar a tarefa criada
@@ -143,8 +144,8 @@ app.post('/api/tasks', async (req, res) => {
                 u.name as user_name 
             FROM tasks t 
             JOIN users u ON t.user_id = u.id 
-            WHERE t.id = ?
-        `, [result.lastID]);
+            WHERE t.id = $1
+        `, [result.rows[0].id]);
         
         res.json({
             success: true,
@@ -168,11 +169,11 @@ app.put('/api/tasks/:id', async (req, res) => {
         
         const result = await query(`
             UPDATE tasks 
-            SET title = ?, description = ?, priority = ?, status = ?, due_date = ?, updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?
+            SET title = $1, description = $2, priority = $3, status = $4, due_date = $5, updated_at = CURRENT_TIMESTAMP
+            WHERE id = $6
         `, [title, description, priority, status, due_date, id]);
         
-        if (result.rowsAffected === 0) {
+        if (result.rowCount === 0) {
             return res.status(404).json({
                 success: false,
                 message: 'Tarefa não encontrada'
@@ -192,7 +193,7 @@ app.put('/api/tasks/:id', async (req, res) => {
                 u.name as user_name 
             FROM tasks t 
             JOIN users u ON t.user_id = u.id 
-            WHERE t.id = ?
+            WHERE t.id = $1
         `, [id]);
         
         res.json({
@@ -217,11 +218,11 @@ app.patch('/api/tasks/:id/status', async (req, res) => {
         
         const result = await query(`
             UPDATE tasks 
-            SET status = ?, updated_at = CURRENT_TIMESTAMP
-            WHERE id = ?
+            SET status = $1, updated_at = CURRENT_TIMESTAMP
+            WHERE id = $2
         `, [status, id]);
         
-        if (result.rowsAffected === 0) {
+        if (result.rowCount === 0) {
             return res.status(404).json({
                 success: false,
                 message: 'Tarefa não encontrada'
@@ -241,7 +242,7 @@ app.patch('/api/tasks/:id/status', async (req, res) => {
                 u.name as user_name 
             FROM tasks t 
             JOIN users u ON t.user_id = u.id 
-            WHERE t.id = ?
+            WHERE t.id = $1
         `, [id]);
         
         res.json({
@@ -265,10 +266,10 @@ app.delete('/api/tasks/:id', async (req, res) => {
         
         const result = await query(`
             DELETE FROM tasks 
-            WHERE id = ?
+            WHERE id = $1
         `, [id]);
         
-        if (result.rowsAffected === 0) {
+        if (result.rowCount === 0) {
             return res.status(404).json({
                 success: false,
                 message: 'Tarefa não encontrada'
@@ -323,17 +324,17 @@ app.get('/api/status', (req, res) => {
         app: 'TaskMaster Pro',
         version: '2.0.0',
         environment: process.env.NODE_ENV || 'development',
-        database: 'SQLite',
+        database: 'PostgreSQL',
         timestamp: new Date().toISOString()
     });
 });
 
 // Iniciar servidor
 app.listen(PORT, '0.0.0.0', async () => {
-    console.log(`🚀 TaskMaster Pro v2.0.0`);
-    console.log(`?? Servidor rodando na porta ${PORT}`);
-    console.log(`📊 Ambiente: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`🗄️ Banco: SQLite`);
+    console.log('🚀 TaskMaster Pro v2.0.0');
+    console.log('🌐 Servidor rodando na porta ' + PORT);
+    console.log('📊 Ambiente: ' + (process.env.NODE_ENV || 'development'));
+    console.log('🗄️ Banco: PostgreSQL');
     console.log('─'.repeat(50));
     
     // Inicializar banco de dados
@@ -344,9 +345,6 @@ app.listen(PORT, '0.0.0.0', async () => {
     if (dbConnected) {
         console.log('🎯 Aplicação pronta para uso!');
     } else {
-        console.log('⚠️  Aplicação iniciada, mas sem conexão com banco');
+        console.log('⚠️ Aplicação iniciada, mas sem conexão com banco');
     }
 });
- 
- / /   R e d e p l o y :   2 0 2 5 - 0 6 - 1 7   0 7 : 1 1 : 2 7  
- 

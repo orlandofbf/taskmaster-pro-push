@@ -6,8 +6,18 @@ require('dotenv').config();
 // Importar configuração do banco
 const { query, testConnection, initializeDatabase } = require('./config/database');
 
+// Inicializar banco de dados
+const { execSync } = require('child_process');
+try {
+    console.log('🔧 Inicializando banco de dados...');
+    execSync('node init-db.js', { stdio: 'inherit' });
+    console.log('✅ Banco inicializado com sucesso!');
+} catch (error) {
+    console.log('⚠️ Erro ao inicializar banco:', error.message);
+}
+
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
 
 // Middlewares
 app.use(cors());

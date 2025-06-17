@@ -17,7 +17,7 @@ try {
 }
 
 const app = express();
-const PORT = process.env.PORT || 8080;
+const PORT = process.env.PORT || 3000;
 
 // Middlewares
 app.use(cors());
@@ -329,9 +329,9 @@ app.get('/api/status', (req, res) => {
 });
 
 // Iniciar servidor
-app.listen(PORT, async () => {
+app.listen(PORT, '0.0.0.0', async () => {
     console.log(`🚀 TaskMaster Pro v2.0.0`);
-    console.log(`🌐 Servidor rodando em http://localhost:${PORT}`);
+    console.log(`?? Servidor rodando na porta ${PORT}`);
     console.log(`📊 Ambiente: ${process.env.NODE_ENV || 'development'}`);
     console.log(`🗄️ Banco: SQLite`);
     console.log('─'.repeat(50));

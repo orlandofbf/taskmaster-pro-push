@@ -5,12 +5,13 @@ const dbPath = path.join(__dirname, 'database.sqlite');
 const db = new sqlite3.Database(dbPath);
 
 db.serialize(() => {
-    // Criar tabela users
+    // Criar tabela users com as colunas corretas
     db.run(`CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        username TEXT UNIQUE NOT NULL,
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL,
         email TEXT UNIQUE NOT NULL,
         password TEXT NOT NULL,
+        is_active BOOLEAN DEFAULT 1,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`);
 
@@ -20,11 +21,17 @@ db.serialize(() => {
         title TEXT NOT NULL,
         description TEXT,
         priority TEXT DEFAULT 'medium',
-        completed BOOLEAN DEFAULT 0,
-        user_id INTEGER,
+        status TEXT DEFAULT 'pendente',
+        due_date DATE,
+        user_id TEXT,
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users (id)
     )`);
+
+    // Inserir usuário padrão se não existir
+    db.run(`INSERT OR IGNORE INTO users (id, name, email, password) 
+            VALUES ('550e8400-e29b-41d4-a716-446655440000', 'Usuário Padrão', 'admin@taskmaster.com', 'admin123')`);
 
     console.log('✅ Tabelas criadas com sucesso!');
 });
